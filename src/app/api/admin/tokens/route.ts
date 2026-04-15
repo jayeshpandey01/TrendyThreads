@@ -23,9 +23,9 @@ export async function POST(req: Request) {
     });
 
     return NextResponse.json(user);
-  } catch (e) {
+  } catch (e: any) {
     console.error("[ADMIN_TOKENS_POST]", e);
-    return new NextResponse("Internal Error", { status: 500 });
+    return NextResponse.json({ error: e?.message || "Internal Server Error" }, { status: 500 });
   }
 }
 

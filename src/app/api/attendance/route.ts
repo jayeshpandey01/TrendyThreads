@@ -7,14 +7,19 @@ export async function POST(req: Request) {
   try {
     const session = await getServerSession(authOptions);
 
-    if (!session || !session.user || (session.user as any).role === "USER") {
-      return new NextResponse("Unauthorized", { status: 401 });
+    if (!session || !session.user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { userId } = await req.json();
+    const { userId, gymId: manualGymId } = await req.json().catch(() => ({}));
 
     if (!userId) {
-      return new NextResponse("Missing userId", { status: 400 });
+      return NextResponse.json({ error: "Missing userId" }, { status: 400 });
+    }
+
+    const role = (session.user as any).role;
+    if (role === "USER") {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const user = await prisma.user.findUnique({
@@ -22,28 +27,40 @@ export async function POST(req: Request) {
     });
 
     if (!user) {
-      return new NextResponse("User not found", { status: 404 });
+      return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
     if (user.tokenBalance <= 0) {
-      return new NextResponse("Insufficient tokens", { status: 400 });
+      return NextResponse.json({ error: "Insufficient tokens" }, { status: 400 });
     }
 
-    // Get gymId for the trainer/owner
+    // Get gymId for the trainer/owner/admin
     let gymId = "";
-    if ((session.user as any).role === "OWNER") {
+    if (role === "ADMIN") {
+      // Admin can specify a gymId, or we use the first one if not provided
+      if (manualGymId) {
+        gymId = manualGymId;
+      } else {
+        const firstGym = await prisma.gym.findFirst({ select: { id: true } });
+        if (!firstGym) return NextResponse.json({ error: "No gyms found" }, { status: 404 });
+        gymId = firstGym.id;
+      }
+    } else if (role === "OWNER") {
       const gym = await prisma.gym.findUnique({
         where: { ownerId: (session.user as any).id },
+        select: { id: true },
       });
-      if (!gym) return new NextResponse("Gym not found", { status: 404 });
+      if (!gym) return NextResponse.json({ error: "Gym not found" }, { status: 404 });
       gymId = gym.id;
-    } else {
-      // Role is TRAINER
+    } else if (role === "TRAINER") {
       const trainer = await prisma.user.findUnique({
         where: { id: (session.user as any).id },
+        select: { gymId: true },
       });
-      if (!trainer?.gymId) return new NextResponse("Trainer not assigned to gym", { status: 404 });
+      if (!trainer?.gymId) return NextResponse.json({ error: "Trainer not assigned to gym" }, { status: 404 });
       gymId = trainer.gymId;
+    } else {
+      return NextResponse.json({ error: "Invalid role" }, { status: 401 });
     }
 
     // Deduct token and log visit
@@ -66,8 +83,11 @@ export async function POST(req: Request) {
       userName: updatedUser[0].name,
       tokenBalance: updatedUser[0].tokenBalance,
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error("[ATTENDANCE_POST]", error);
-    return new NextResponse("Internal Error", { status: 500 });
+    return NextResponse.json(
+      { error: error?.message || "Internal Server Error" }, 
+      { status: 500 }
+    );
   }
 }

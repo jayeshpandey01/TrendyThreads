@@ -67,8 +67,8 @@ export async function GET() {
     });
 
     return NextResponse.json(gyms);
-  } catch (error) {
+  } catch (error: any) {
     console.error("[GYMS_GET]", error);
-    return new NextResponse("Internal Error", { status: 500 });
+    return NextResponse.json({ error: error?.message || "Internal Server Error" }, { status: 500 });
   }
 }

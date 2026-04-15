@@ -21,9 +21,9 @@ export async function GET() {
     });
 
     return NextResponse.json(users);
-  } catch (e) {
+  } catch (e: any) {
     console.error("[ADMIN_USERS_GET]", e);
-    return new NextResponse("Internal Error", { status: 500 });
+    return NextResponse.json({ error: e?.message || "Internal Server Error" }, { status: 500 });
   }
 }
 

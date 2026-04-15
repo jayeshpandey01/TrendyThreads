@@ -20,62 +20,53 @@ export const authOptions: NextAuthOptions = {
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
     }),
     CredentialsProvider({
-      id: "admin-credentials",
-      name: "admin",
-      credentials: {
-        email: { label: "Admin Email", type: "email" },
-        password: { label: "Admin Password", type: "password" },
-      },
-      async authorize(credentials) {
-        const email = credentials?.email?.trim().toLowerCase() ?? "";
-        const password = credentials?.password ?? "";
-        
-        if (!email || !isAdminEmail(email) || !isAdminPassword(password)) {
-          return null;
-        }
-
-        let user = await prisma.user.findUnique({ where: { email } });
-        
-        // Auto-provision admin user if they match .env but aren't in DB
-        if (!user) {
-          user = await prisma.user.create({
-            data: {
-              email,
-              name: "System Admin",
-              role: "ADMIN" as any, // Cast if role enum doesn't have ADMIN yet, but schema says it does?
-              // password is not strictly needed since we authenticate via .env
-            }
-          });
-        }
-
-        return {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-          role: "ADMIN",
-        } as any;
-      },
-    }),
-    CredentialsProvider({
+      id: "credentials",
       name: "credentials",
       credentials: {
         email: { label: "Email", type: "email" },
         password: { label: "Password", type: "password" },
       },
       async authorize(credentials) {
-        if (!credentials?.email || !credentials?.password) {
-          throw new Error("Invalid credentials");
+        const email = credentials?.email?.trim().toLowerCase() ?? "";
+        const password = credentials?.password ?? "";
+
+        if (!email || !password) {
+          throw new Error("Email and password are required");
         }
 
+        // 1. Check if this is a "Super Admin" from .env
+        if (isAdminEmail(email) && isAdminPassword(password)) {
+          let user = await prisma.user.findUnique({ where: { email } });
+          
+          if (!user) {
+            // Auto-provision admin if they don't exist in DB yet
+            user = await prisma.user.create({
+              data: {
+                email,
+                name: "System Admin",
+                role: "ADMIN",
+              }
+            });
+          }
+
+          return {
+            id: user.id,
+            email: user.email,
+            name: user.name,
+            role: "ADMIN",
+          };
+        }
+
+        // 2. Regular User Authentication
         const user = await prisma.user.findUnique({
-          where: { email: credentials.email },
+          where: { email },
         });
 
         if (!user || !user.password) {
           throw new Error("Invalid credentials");
         }
 
-        const isValid = await bcrypt.compare(credentials.password, user.password);
+        const isValid = await bcrypt.compare(password, user.password);
 
         if (!isValid) {
           throw new Error("Invalid credentials");

@@ -84,11 +84,11 @@ export default function TrainerScannerPage() {
         // Refresh stats after success
         fetchStats();
       } else {
-        const errorText = await res.text();
+        const data = await res.json().catch(() => ({ error: "Unknown error" }));
         setScannedUser({
           name: "Scan Error",
           status: "ERROR",
-          message: errorText
+          message: data.error || "Failed to process attendance"
         });
       }
     } catch (err) {

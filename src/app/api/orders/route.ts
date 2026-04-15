@@ -82,8 +82,11 @@ export async function POST(req: Request) {
   } catch (error: any) {
     console.error("[ORDERS_POST]", error);
     const msg = typeof error?.message === "string" ? error.message : "Internal Error";
-    const status = msg.includes("Unauthorized") ? 401 : msg.includes("Missing") ? 400 : 400;
-    return new NextResponse(msg, { status });
+    let status = 400;
+    if (msg.includes("Unauthorized")) status = 401;
+    if (msg.includes("not found")) status = 404;
+    
+    return NextResponse.json({ error: msg }, { status });
   }
 }
 

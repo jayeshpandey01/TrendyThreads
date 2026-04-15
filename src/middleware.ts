@@ -11,17 +11,17 @@ export default withAuth(
       .filter(Boolean);
 
     // Admin/Gym Owner only routes
-    if (path.startsWith("/owner") && token?.role !== "OWNER") {
+    if (path.startsWith("/owner") && token?.role !== "OWNER" && token?.role !== "ADMIN") {
       return NextResponse.redirect(new URL("/", req.url));
     }
 
     // Trainer only routes
-    if (path.startsWith("/trainer") && token?.role !== "TRAINER") {
+    if (path.startsWith("/trainer") && token?.role !== "TRAINER" && token?.role !== "ADMIN") {
       return NextResponse.redirect(new URL("/", req.url));
     }
 
-    // Admin-only routes (email allowlist)
-    if (path.startsWith("/admin")) {
+    // Admin-only routes (email allowlist or role)
+    if (path.startsWith("/admin") || path.startsWith("/api/admin")) {
       if (path === "/admin/login") return;
       const email = typeof token?.email === "string" ? token.email.toLowerCase() : "";
       const isAdmin = token?.role === "ADMIN" || (!!email && adminEmails.includes(email));
@@ -38,7 +38,9 @@ export default withAuth(
   {
     callbacks: {
       authorized: ({ req, token }) => {
-        if (req.nextUrl.pathname === "/admin/login") return true;
+        const path = req.nextUrl.pathname;
+        if (path === "/admin/login") return true;
+        // Allow public API routes if needed, or protect all /api/admin
         return !!token;
       },
     },
@@ -46,5 +48,11 @@ export default withAuth(
 );
 
 export const config = {
-  matcher: ["/dashboard/:path*", "/owner/:path*", "/trainer/:path*", "/admin/:path*"],
+  matcher: [
+    "/dashboard/:path*", 
+    "/owner/:path*", 
+    "/trainer/:path*", 
+    "/admin/:path*",
+    "/api/admin/:path*"
+  ],
 };

@@ -8,7 +8,7 @@ export async function GET() {
     const session = await getServerSession(authOptions);
 
     if (!session || !session.user) {
-      return new NextResponse("Unauthorized", { status: 401 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const userId = (session.user as any).id;
@@ -40,10 +40,6 @@ export async function GET() {
     const last7Days = new Date();
     last7Days.setDate(last7Days.getDate() - 7);
 
-    // This is a simplification, in a real app you'd track member registrations per gym
-    // For now, let's say "new registrations" is visits from new users in last 7 days? 
-    // Or just a mock number if the schema doesn't support "Member" relation yet.
-    // Actually, users don't "register" to a gym in this schema, they just visit.
     const newRegistrations = await prisma.visitLog.groupBy({
       by: ['userId'],
       where: {
@@ -82,8 +78,8 @@ export async function GET() {
         recentActivity
       }
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error("[OWNER_GYM_GET]", error);
-    return new NextResponse("Internal Error", { status: 500 });
+    return NextResponse.json({ error: error?.message || "Internal Server Error" }, { status: 500 });
   }
 }
