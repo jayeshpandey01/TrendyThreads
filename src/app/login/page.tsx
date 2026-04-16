@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useState, Suspense } from "react";
 import Link from "next/link";
@@ -13,6 +13,7 @@ import {
   Lock,
   ArrowRight,
   AlertCircle,
+  ShieldCheck,
 } from "lucide-react";
 import logo from "../../../assest/Logo1.png";
 
@@ -129,10 +130,16 @@ function LoginForm() {
           Continue with Google
         </Button>
 
-        <p className="text-center text-sm text-white/40 pt-4">
-          Don't have an account?{" "}
-          <Link href="/signup" className="text-neon-lime hover:underline font-bold">
-            Sign Up for Free
+        <p className="text-center text-sm text-white/40 pt-4 flex flex-col gap-4">
+          <span>
+            Don't have an account?{" "}
+            <Link href="/signup" className="text-neon-lime hover:underline font-bold">
+              Sign Up for Free
+            </Link>
+          </span>
+          <Link href="/admin" className="inline-flex items-center justify-center gap-2 text-white/20 hover:text-white/60 transition-colors text-xs uppercase tracking-widest font-bold">
+            <ShieldCheck size={14} />
+            Admin Access
           </Link>
         </p>
       </form>

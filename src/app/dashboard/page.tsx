@@ -10,8 +10,10 @@ import {
   QrCode, 
   User as UserIcon,
   ChevronRight,
-  Plus
+  Plus,
+  LogOut
 } from "lucide-react";
+import { signOut } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { 
@@ -79,6 +81,15 @@ export default function UserDashboard() {
             >
               <QrCode className="mr-2 h-5 w-5 group-hover:rotate-12 transition-transform" /> 
               {showQR ? "Hide QR Access" : "My QR Access"}
+            </Button>
+            <Button 
+                variant="outline" 
+                size="lg" 
+                className="border-white/10 bg-white/5 hover:bg-red-500/10 text-red-500 hover:text-red-400 font-bold"
+                onClick={() => signOut({ callbackUrl: "/" })}
+            >
+              <LogOut className="mr-2 h-5 w-5" />
+              Logout
             </Button>
           </div>
         </div>

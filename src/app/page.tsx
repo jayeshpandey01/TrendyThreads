@@ -1,4 +1,4 @@
-﻿import Link from "next/link";
+import Link from "next/link";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import {
@@ -10,36 +10,12 @@ import {
 } from "lucide-react";
 import logo from "../../assest/Logo1.png";
 
+import { SiteHeader } from "@/components/site-header";
+
 export default function LandingPage() {
   return (
     <div className="flex flex-col min-h-screen bg-[#0a0a0a] text-white selection:bg-neon-lime selection:text-black">
-      {/* Navigation */}
-      <header className="px-6 lg:px-10 h-20 flex items-center justify-between border-b border-white/5 bg-black/50 backdrop-blur-xl sticky top-0 z-50">
-        <Link className="inline-flex items-center justify-center gap-3 group" href="/">
-          <Image
-            src={logo}
-            alt="Trendy Threads logo"
-            width={32}
-            height={32}
-            className="h-8 w-8 rounded-md object-contain"
-            priority
-          />
-          <span className="text-xl font-bold tracking-tighter">Trendy <span className="text-neon-lime">Threads</span></span>
-        </Link>
-        <nav className="hidden md:flex gap-8 text-sm font-medium text-white/70">
-          <Link className="hover:text-neon-lime transition-colors" href="#features">Features</Link>
-          <Link className="hover:text-neon-lime transition-colors" href="/gyms">Nearby Gyms</Link>
-          <Link className="hover:text-neon-lime transition-colors" href="/shop">Shop</Link>
-        </nav>
-        <div className="flex gap-4">
-          <Button variant="ghost" asChild className="hidden sm:inline-flex hover:bg-white/5">
-            <Link href="/login">Login</Link>
-          </Button>
-          <Button className="bg-neon-lime text-black hover:bg-neon-lime/90 font-bold" asChild>
-            <Link href="/signup">Get Started</Link>
-          </Button>
-        </div>
-      </header>
+      <SiteHeader />
 
       <main className="flex-1">
         {/* Hero Section */}
