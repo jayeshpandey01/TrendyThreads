@@ -87,11 +87,77 @@ export async function GET() {
       orderBy: { createdAt: "desc" },
     });
 
+    const last28Days = addDays(today, -28);
+    const last28DaysVisits = await prisma.visitLog.count({
+      where: {
+        userId,
+        timestamp: { gte: last28Days, lt: toExclusive },
+      },
+    });
+    const avgWeeklyVisits = parseFloat((last28DaysVisits / 4).toFixed(1));
+
+    // Calculate current streak
+    const allVisits = await prisma.visitLog.findMany({
+      where: { userId },
+      select: { timestamp: true },
+      orderBy: { timestamp: "desc" },
+    });
+    
+    let currentStreak = 0;
+    let checkDate = new Date(today);
+    
+    // Check if visited today
+    const visitedToday = allVisits.some(v => startOfDay(v.timestamp).getTime() === checkDate.getTime());
+    if (visitedToday) {
+      currentStreak++;
+      checkDate = addDays(checkDate, -1);
+    } else {
+      // If not visited today, streak might be from yesterday
+      checkDate = addDays(checkDate, -1);
+      const visitedYesterday = allVisits.some(v => startOfDay(v.timestamp).getTime() === checkDate.getTime());
+      if (visitedYesterday) {
+        currentStreak++;
+        checkDate = addDays(checkDate, -1);
+      }
+    }
+
+    if (currentStreak > 0) {
+      while (true) {
+        const visited = allVisits.some(v => startOfDay(v.timestamp).getTime() === checkDate.getTime());
+        if (visited) {
+          currentStreak++;
+          checkDate = addDays(checkDate, -1);
+        } else {
+          break;
+        }
+      }
+    }
+
+    // Prepare streak array for visualizer (last 7 days true/false)
+    const streakArray = [];
+    for (let i = 6; i >= 0; i--) {
+      const d = addDays(today, -i);
+      const visited = allVisits.some(v => startOfDay(v.timestamp).getTime() === startOfDay(d).getTime());
+      streakArray.push(visited);
+    }
+
+    const tasks = await prisma.task.findMany({
+      where: { userId },
+      orderBy: { createdAt: "desc" },
+      include: {
+        trainer: { select: { name: true } }
+      }
+    });
+
     return NextResponse.json({
       tokenBalance: user?.tokenBalance || 0,
       recentVisits,
       weeklyVisits,
-      recentTransactions
+      recentTransactions,
+      avgWeeklyVisits,
+      currentStreak,
+      streakArray,
+      tasks
     });
   } catch (error) {
     console.error("[USER_DASHBOARD_GET]", error);

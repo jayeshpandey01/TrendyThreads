@@ -25,7 +25,8 @@ export async function POST(req: Request) {
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
-    const validRole = role === "OWNER" ? "OWNER" : "USER";
+    // Force role to USER to prevent privilege escalation
+    const validRole = "USER";
 
     const user = await prisma.user.create({
       data: {

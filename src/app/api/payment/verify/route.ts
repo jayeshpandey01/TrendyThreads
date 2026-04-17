@@ -62,18 +62,22 @@ export async function POST(req: Request) {
 
     if (type === "SHOP_ORDER") {
       // Handle shop order verification
-      // Find order by Razorpay order ID stored in notes
+      // Find order by exact Razorpay order ID
       const order = await prisma.order.findFirst({
-        where: { status: "PENDING" },
-        orderBy: { createdAt: "desc" },
+        where: { razorpayOrderId: razorpay_order_id },
       });
 
-      if (order) {
-        await prisma.order.update({
-          where: { id: order.id },
-          data: { status: "PAID" },
-        });
+      if (!order || order.status !== "PENDING") {
+        return NextResponse.json({ error: "Order not found or already paid" }, { status: 400 });
       }
+
+      await prisma.order.update({
+        where: { id: order.id },
+        data: { 
+          status: "PAID",
+          razorpayPaymentId: razorpay_payment_id,
+        },
+      });
 
       return NextResponse.json({ 
         success: true, 

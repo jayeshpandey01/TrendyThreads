@@ -27,7 +27,7 @@ model User {
   tokenBalance  Int       @default(0)
   
   // Gym Owner specific
-  gym           Gym?      @relation("GymOwner")
+  gyms          Gym[]     @relation("GymOwner")
   
   // Trainer specific
   gymId         String?   @db.ObjectId
@@ -41,6 +41,11 @@ model User {
 
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
+
+  tasksAssigned Task[]    @relation("TasksAssigned")
+  tasksReceived Task[]    @relation("TasksReceived")
+  messagesSent  Message[] @relation("MessagesSent")
+  messagesReceived Message[] @relation("MessagesReceived")
 }
 
 model Gym {
@@ -54,7 +59,7 @@ model Gym {
   contact     String?
   images      String[]
   
-  ownerId     String   @unique @db.ObjectId
+  ownerId     String   @db.ObjectId
   owner       User     @relation("GymOwner", fields: [ownerId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   
   trainers    User[]   @relation("GymTrainer")
@@ -104,8 +109,10 @@ model Order {
   user        User     @relation(fields: [userId], references: [id])
   items       Json     
   totalAmount Float
-  status      String   @default("PENDING")
-  createdAt   DateTime @default(now())
+  status            String   @default("PENDING")
+  razorpayOrderId   String?  
+  razorpayPaymentId String?  
+  createdAt         DateTime @default(now())
   updatedAt   DateTime @updatedAt
 }
 
@@ -143,4 +150,29 @@ model VerificationToken {
   expires    DateTime
 
   @@unique([identifier, token])
+}
+
+model Task {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  title       String
+  description String?
+  isCompleted Boolean  @default(false)
+  trainerId   String   @db.ObjectId
+  userId      String   @db.ObjectId
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  trainer     User     @relation("TasksAssigned", fields: [trainerId], references: [id])
+  user        User     @relation("TasksReceived", fields: [userId], references: [id])
+}
+
+model Message {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  content     String
+  senderId    String   @db.ObjectId
+  receiverId  String   @db.ObjectId
+  createdAt   DateTime @default(now())
+
+  sender      User     @relation("MessagesSent", fields: [senderId], references: [id])
+  receiver    User     @relation("MessagesReceived", fields: [receiverId], references: [id])
 }

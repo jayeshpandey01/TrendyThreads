@@ -60,37 +60,33 @@ export async function POST(req: Request) {
       key_secret: process.env.RAZORPAY_KEY_SECRET!,
     });
 
-    const order = await prisma.$transaction(async (tx) => {
-      // Create the DB order first
-      const dbOrder = await tx.order.create({
-        data: {
-          userId,
-          items: orderItems,
-          totalAmount,
-          status: "PENDING",
-        },
-      });
+    // Create Razorpay order first to get the ID
+    const rzpOrder = await razorpay.orders.create({
+      amount: Math.round(totalAmount * 100), // in paisa
+      currency: "INR",
+      receipt: `rcpt_${Date.now()}`,
+      notes: {
+        userId,
+        type: "SHOP_ORDER",
+      },
+    });
 
-      // Create Razorpay order
-      const rzpOrder = await razorpay.orders.create({
-        amount: Math.round(totalAmount * 100), // in paisa
-        currency: "INR",
-        receipt: dbOrder.id,
-        notes: {
-          orderId: dbOrder.id,
-          userId,
-          type: "SHOP_ORDER",
-        },
-      });
-
-      return { dbOrder, rzpOrder };
+    // Create the DB order and link the Razorpay Order ID
+    const dbOrder = await prisma.order.create({
+      data: {
+        userId,
+        items: orderItems,
+        totalAmount,
+        status: "PENDING",
+        razorpayOrderId: rzpOrder.id,
+      },
     });
 
     return NextResponse.json({
-      orderId: order.dbOrder.id,
-      rzpOrderId: order.rzpOrder.id,
-      amount: order.rzpOrder.amount,
-      currency: order.rzpOrder.currency,
+      orderId: dbOrder.id,
+      rzpOrderId: rzpOrder.id,
+      amount: rzpOrder.amount,
+      currency: rzpOrder.currency,
     });
   } catch (error: any) {
     console.error("[ORDERS_POST]", error);

@@ -7,13 +7,13 @@ export async function GET() {
   try {
     const session = await getServerSession(authOptions);
 
-    if (!session || !session.user) {
+    if (!session || !session.user || (session.user as any).role !== "OWNER") {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const userId = (session.user as any).id;
 
-    const gym = await prisma.gym.findUnique({
+    const gym = await prisma.gym.findFirst({
       where: { ownerId: userId },
       include: {
         trainers: true,
@@ -50,7 +50,7 @@ export async function GET() {
       }
     });
 
-    const recentActivity = await prisma.visitLog.findMany({
+      const recentActivity = await prisma.visitLog.findMany({
       where: {
         gymId: gym.id
       },
@@ -69,13 +69,43 @@ export async function GET() {
       }
     });
 
+    // Calculate weekly visits array
+    const weeklyVisits = [];
+    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(today);
+      d.setDate(d.getDate() - i);
+      const start = new Date(d);
+      const end = new Date(d);
+      end.setDate(end.getDate() + 1);
+      
+      const count = await prisma.visitLog.count({
+        where: {
+          gymId: gym.id,
+          timestamp: {
+            gte: start,
+            lt: end
+          }
+        }
+      });
+      weeklyVisits.push({ day: days[d.getDay()], count });
+    }
+
+    // Rough revenue share calculation: 1 token = ₹50, owner gets say ₹40
+    const allVisitsCount = await prisma.visitLog.count({
+      where: { gymId: gym.id }
+    });
+    const revenue = allVisitsCount * 40;
+
     return NextResponse.json({
       gym,
       stats: {
         todayVisits,
         activeTrainers: gym.trainers.length,
         newRegistrations: newRegistrations.length,
-        recentActivity
+        recentActivity,
+        weeklyVisits,
+        revenue
       }
     });
   } catch (error: any) {

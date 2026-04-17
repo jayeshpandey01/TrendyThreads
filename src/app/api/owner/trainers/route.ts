@@ -13,7 +13,7 @@ export async function GET() {
     }
 
     const userId = (session.user as any).id;
-    const gym = await prisma.gym.findUnique({
+    const gym = await prisma.gym.findFirst({
       where: { ownerId: userId },
       select: { id: true }
     });
@@ -52,7 +52,7 @@ export async function POST(req: Request) {
     }
 
     const userId = (session.user as any).id;
-    const gym = await prisma.gym.findUnique({
+    const gym = await prisma.gym.findFirst({
       where: { ownerId: userId },
       select: { id: true }
     });

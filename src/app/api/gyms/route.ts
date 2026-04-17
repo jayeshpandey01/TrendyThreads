@@ -20,7 +20,7 @@ export async function POST(req: Request) {
     }
 
     // Check if user already has a gym
-    const existingGym = await prisma.gym.findUnique({
+    const existingGym = await prisma.gym.findFirst({
       where: { ownerId: userId },
     });
 

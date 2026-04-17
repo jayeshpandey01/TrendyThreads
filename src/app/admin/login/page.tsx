@@ -33,9 +33,11 @@ export default function AdminLoginPage() {
     if (res?.error) {
       setError("Invalid admin email or password");
     } else {
-      const session = await getSession();
-      const role = (session?.user as any)?.role;
+      const sessionRes = await fetch("/api/auth/session");
+      const session = await sessionRes.json();
+      const role = session?.user?.role;
       router.push(getDashboardPath(role));
+      router.refresh();
     }
 
     setLoading(false);

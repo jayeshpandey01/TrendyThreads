@@ -61,7 +61,7 @@ export async function POST(req: Request) {
         gymId = firstGym.id;
       }
     } else if (role === "OWNER") {
-      const gym = await prisma.gym.findUnique({
+      const gym = await prisma.gym.findFirst({
         where: { ownerId: (session.user as any).id },
         select: { id: true },
       });

@@ -45,10 +45,12 @@ function LoginForm() {
       if (res?.error) {
         setError("Invalid email or password");
       } else {
-        // Fetch session to get user role and redirect to correct dashboard
-        const session = await getSession();
-        const role = (session?.user as any)?.role;
+        // Fetch session directly to bypass client caching and get role
+        const sessionRes = await fetch("/api/auth/session");
+        const session = await sessionRes.json();
+        const role = session?.user?.role;
         router.push(getDashboardPath(role));
+        router.refresh();
       }
     } catch (err) {
       setError("An error occurred during login");

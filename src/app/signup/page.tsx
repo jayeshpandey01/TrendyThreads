@@ -1,9 +1,11 @@
-﻿"use client";
+"use client";
 
 import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
+import { signIn } from "next-auth/react";
+import { getDashboardPath } from "@/lib/dashboard-path";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -46,7 +48,24 @@ export default function SignupPage() {
       });
 
       if (res.ok) {
-        router.push("/login?message=Registration successful");
+        // Auto-login after successful registration
+        const signInRes = await signIn("credentials", {
+          email: data.email as string,
+          password: data.password as string,
+          redirect: false,
+        });
+
+        if (signInRes?.error) {
+          router.push("/login?message=Registration successful. Please log in.");
+        } else {
+          // Fetch session directly to bypass client caching and get role
+          const sessionRes = await fetch("/api/auth/session");
+          const session = await sessionRes.json();
+          const userRole = session?.user?.role || data.role;
+          
+          router.push(getDashboardPath(userRole as string));
+          router.refresh();
+        }
       } else {
         const errorData = await res.json();
         setError(errorData.message || "Something went wrong");

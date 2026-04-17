@@ -1,202 +1,214 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Html5QrcodeScanner } from "html5-qrcode";
+import { useSession } from "next-auth/react";
+import { useState, useEffect } from "react";
+import Link from "next/link";
 import { 
-  ScanLine, 
+  Users, 
   Dumbbell, 
-  UserCheck, 
-  AlertTriangle,
-  RefreshCcw,
-  Zap
+  MessageSquare, 
+  Scan, 
+  CheckCircle, 
+  Activity,
+  Plus
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
-export default function TrainerScannerPage() {
-  const [scanResult, setScanResult] = useState<string | null>(null);
-  const [scannedUser, setScannedUser] = useState<any>(null);
-  const [loading, setLoading] = useState(false);
+export default function TrainerDashboard() {
+  const { data: session } = useSession();
+  const [loading, setLoading] = useState(true);
+  const [data, setData] = useState<any>(null);
 
-  useEffect(() => {
-    const scanner = new Html5QrcodeScanner(
-      "reader",
-      { 
-        fps: 10, 
-        qrbox: { width: 250, height: 250 },
-        rememberLastUsedCamera: true,
-        supportedScanTypes: [0] // Camera only
-      },
-      /* verbose= */ false
-    );
+  // Task Assign Modal State
+  const [showTaskModal, setShowTaskModal] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<any>(null);
+  const [taskTitle, setTaskTitle] = useState("");
+  const [taskDesc, setTaskDesc] = useState("");
 
-    scanner.render(onScanSuccess, onScanFailure);
-
-    function onScanSuccess(decodedText: string) {
-      setScanResult(decodedText);
-      scanner.clear();
-      processAttendance(decodedText);
-    }
-
-    function onScanFailure(error: any) {
-      // Quietly continue
-    }
-
-    return () => {
-      scanner.clear().catch(e => console.error("Failed to clear scanner", e));
-    };
-  }, []);
-
-  const [stats, setStats] = useState({ shiftCheckins: 0, gymLoad: 0 });
-
-  useEffect(() => {
-    fetchStats();
-  }, []);
-
-  const fetchStats = async () => {
+  const fetchDashboardData = async () => {
     try {
-      const res = await fetch("/api/trainer/stats");
+      const res = await fetch("/api/trainer/dashboard");
       if (res.ok) {
-        const data = await res.json();
-        setStats(data);
-      }
-    } catch (err) {
-      console.error("Failed to fetch trainer stats", err);
-    }
-  };
-
-  const processAttendance = async (userId: string) => {
-    setLoading(true);
-    try {
-      const res = await fetch("/api/attendance", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId }),
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        setScannedUser({
-          name: data.userName,
-          tokensRemain: data.tokenBalance,
-          status: "SUCCESS"
-        });
-        // Refresh stats after success
-        fetchStats();
-      } else {
-        const data = await res.json().catch(() => ({ error: "Unknown error" }));
-        setScannedUser({
-          name: "Scan Error",
-          status: "ERROR",
-          message: data.error || "Failed to process attendance"
-        });
+        setData(await res.json());
       }
     } catch (err) {
       console.error(err);
-      setScannedUser({
-        name: "Network Error",
-        status: "ERROR"
-      });
     } finally {
       setLoading(false);
     }
   };
 
-  const resetScanner = () => {
-    window.location.reload();
+  useEffect(() => {
+    if (session) {
+      fetchDashboardData();
+    }
+  }, [session]);
+
+  const handleAssignTask = async () => {
+    if (!taskTitle || !selectedUser) return;
+    try {
+      const res = await fetch("/api/trainer/tasks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: selectedUser.id,
+          title: taskTitle,
+          description: taskDesc
+        })
+      });
+      if (res.ok) {
+        setShowTaskModal(false);
+        setTaskTitle("");
+        setTaskDesc("");
+        fetchDashboardData(); // Refresh tasks
+      }
+    } catch (error) {
+      console.error(error);
+    }
   };
 
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-neon-lime"></div>
+      </div>
+    );
+  }
+
+  if (!data?.gym) {
+    return (
+      <div className="min-h-screen bg-[#0a0a0a] flex flex-col items-center justify-center p-6 text-center space-y-6">
+        <h1 className="text-3xl font-bold">Unassigned Trainer</h1>
+        <p className="text-white/40 max-w-md">You are not assigned to any gym. Ask your Gym Owner to add you.</p>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-[#0a0a0a] text-white flex flex-col items-center p-6 lg:p-10">
-      <div className="max-w-md w-full space-y-8">
-        <div className="text-center space-y-2">
-          <div className="inline-flex p-3 bg-neon-lime rounded-2xl mb-4">
-             <ScanLine className="text-black w-8 h-8" />
+    <div className="min-h-screen bg-[#0a0a0a] text-white p-6 lg:p-10 relative">
+      <div className="max-w-7xl mx-auto space-y-10">
+        {/* Header */}
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 border-b border-white/5 pb-8">
+          <div className="space-y-1">
+            <h1 className="text-4xl font-black tracking-tighter">TRAINER <span className="text-neon-lime">HUB</span></h1>
+            <p className="text-white/40 text-sm font-light uppercase tracking-widest">At: <span className="text-white font-bold">{data.gym.name}</span></p>
           </div>
-          <h1 className="text-3xl font-black tracking-tighter uppercase italic">Trainer <span className="text-neon-lime">Vault</span></h1>
-          <p className="text-white/40 text-sm font-light">Scan athlete QR to verify & deduct session token.</p>
-        </div>
-
-        {!scanResult ? (
-          <Card className="bg-[#111] border-white/5 overflow-hidden border-t-4 border-t-neon-lime">
-            <CardHeader className="text-center pb-2">
-              <CardTitle className="text-sm font-bold uppercase tracking-widest text-white/50">Scanner Active</CardTitle>
-            </CardHeader>
-            <CardContent className="p-0">
-               <div id="reader" className="w-full"></div>
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <Card className={`bg-[#111] border-white/5 border-l-4 ${scannedUser?.status === 'SUCCESS' ? 'border-l-neon-lime' : 'border-l-red-500'}`}>
-              <CardContent className="p-8 space-y-6 text-center">
-                {loading ? (
-                    <div className="space-y-4">
-                      <RefreshCcw className="w-10 h-10 text-neon-lime animate-spin mx-auto" />
-                      <p className="text-white/40 text-xs font-bold uppercase tracking-widest">Validating Token...</p>
-                    </div>
-                ) : (
-                  <>
-                    <div className="w-20 h-20 bg-neon-lime/10 rounded-full flex items-center justify-center mx-auto border border-neon-lime/20">
-                      <UserCheck className="text-neon-lime w-10 h-10" />
-                    </div>
-                    <div className="space-y-1">
-                      <h2 className="text-2xl font-black">{scannedUser?.name}</h2>
-                      {scannedUser?.status === 'SUCCESS' ? (
-                        <p className="text-neon-lime text-xs font-bold uppercase tracking-widest">Access Granted</p>
-                      ) : (
-                        <p className="text-red-500 text-xs font-bold uppercase tracking-widest">{scannedUser?.message || "Access Denied"}</p>
-                      )}
-                    </div>
-                    
-                    <div className="grid grid-cols-2 gap-4 py-4 border-y border-white/5">
-                        <div className="text-center">
-                           <p className="text-[10px] text-white/20 uppercase font-bold mb-1">Deducted</p>
-                           <p className="text-white font-black">1 Token</p>
-                        </div>
-                        <div className="text-center">
-                           <p className="text-[10px] text-white/20 uppercase font-bold mb-1">Balance</p>
-                           <p className="text-white font-black">{scannedUser?.tokensRemain} Left</p>
-                        </div>
-                    </div>
-                  </>
-                )}
-              </CardContent>
-            </Card>
-
-            <Button 
-                onClick={resetScanner} 
-                className="w-full h-14 bg-white text-black hover:bg-neon-lime font-black text-lg transition-all active:scale-95"
-            >
-                Next Athlete
+          <div className="flex gap-4">
+            <Button asChild className="bg-neon-lime text-black hover:bg-neon-lime/90 font-bold">
+              <Link href="/trainer/scan">
+                <Scan className="mr-2 h-4 w-4" /> Scan QR
+              </Link>
             </Button>
           </div>
-        )}
-
-        <div className="grid grid-cols-2 gap-4">
-             <Card key="shift-checkins" className="bg-[#111] border-white/5 p-4 flex items-center gap-3">
-                <div className="p-2 bg-blue-500/10 rounded-lg"><Zap size={16} className="text-blue-500" /></div>
-                <div>
-                   <p className="text-[10px] text-white/30 font-bold uppercase tracking-widest">Shift Checkins</p>
-                   <p className="text-lg font-black">{stats.shiftCheckins}</p>
-                </div>
-             </Card>
-             <Card key="gym-load" className="bg-[#111] border-white/5 p-4 flex items-center gap-3">
-                <div className="p-2 bg-purple-500/10 rounded-lg"><Dumbbell size={16} className="text-purple-500" /></div>
-                <div>
-                   <p className="text-[10px] text-white/30 font-bold uppercase tracking-widest">Gym Load</p>
-                   <p className="text-lg font-black tracking-tight">{stats.gymLoad}%</p>
-                </div>
-             </Card>
         </div>
 
-        <div className="p-4 rounded-2xl bg-orange-500/5 border border-orange-500/10 flex gap-3">
-           <AlertTriangle className="text-orange-500 h-5 w-5 shrink-0" />
-           <p className="text-[10px] text-orange-500/80 leading-relaxed font-medium uppercase italic">
-              Safety Reminder: Ensure all athletes sanitize equipment after use. Report any suspicious QR attempts to management.
-           </p>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Athlete Roster */}
+          <Card className="bg-[#111] border-white/5 lg:col-span-2">
+            <CardHeader>
+              <CardTitle className="text-lg font-bold flex items-center gap-2">
+                <Users className="text-neon-lime" /> Your Athletes
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {data.athletes?.map((athlete: any) => (
+                <div key={athlete.id} className="flex items-center justify-between p-4 bg-white/5 rounded-2xl border border-white/10">
+                  <div className="flex items-center gap-4">
+                    <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center font-bold text-neon-lime">
+                      {athlete.name?.[0] || "?"}
+                    </div>
+                    <div>
+                      <h4 className="font-bold">{athlete.name}</h4>
+                      <p className="text-[10px] text-white/40">Last visit: {new Date(athlete.lastVisit).toLocaleDateString()}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button 
+                      variant="ghost" 
+                      className="bg-white/5 hover:bg-neon-lime hover:text-black transition-colors rounded-xl"
+                      onClick={() => { setSelectedUser(athlete); setShowTaskModal(true); }}
+                    >
+                      <Plus className="mr-2 h-4 w-4" /> Task
+                    </Button>
+                    <Button asChild variant="ghost" className="bg-white/5 hover:bg-blue-500 hover:text-white transition-colors rounded-xl">
+                      <Link href={`/trainer/chat/${athlete.id}`}>
+                        <MessageSquare className="mr-2 h-4 w-4" /> Chat
+                      </Link>
+                    </Button>
+                  </div>
+                </div>
+              ))}
+              {data.athletes?.length === 0 && (
+                <p className="text-center text-white/30 text-sm">No athletes have visited this gym yet.</p>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Assigned Tasks Tracker */}
+          <Card className="bg-[#111] border-white/5">
+            <CardHeader>
+              <CardTitle className="text-lg font-bold flex items-center gap-2">
+                <Activity className="text-neon-lime" /> Assigned Tasks
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {data.assignedTasks?.map((task: any) => (
+                <div key={task.id} className="p-3 bg-white/5 rounded-xl border border-white/5">
+                  <div className="flex justify-between items-start mb-1">
+                    <h4 className="text-sm font-bold">{task.title}</h4>
+                    {task.isCompleted ? (
+                      <CheckCircle className="text-neon-lime h-4 w-4" />
+                    ) : (
+                      <div className="h-4 w-4 rounded-full border border-white/30" />
+                    )}
+                  </div>
+                  <p className="text-[10px] text-neon-lime uppercase tracking-widest">{task.user?.name}</p>
+                </div>
+              ))}
+              {data.assignedTasks?.length === 0 && (
+                <p className="text-center text-white/30 text-xs">No tasks assigned yet.</p>
+              )}
+            </CardContent>
+          </Card>
         </div>
       </div>
+
+      {/* Task Modal */}
+      {showTaskModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+          <Card className="bg-[#111] border-white/10 max-w-md w-full shadow-2xl">
+            <CardHeader>
+              <CardTitle>Assign Task to {selectedUser?.name}</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <label className="text-xs text-white/60">Task Title</label>
+                <input 
+                  className="w-full bg-white/5 border border-white/10 rounded-lg p-3 text-sm focus:border-neon-lime outline-none"
+                  value={taskTitle}
+                  onChange={(e) => setTaskTitle(e.target.value)}
+                  placeholder="e.g. Do 50 Pushups"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs text-white/60">Description (Optional)</label>
+                <textarea 
+                  className="w-full bg-white/5 border border-white/10 rounded-lg p-3 text-sm focus:border-neon-lime outline-none"
+                  rows={3}
+                  value={taskDesc}
+                  onChange={(e) => setTaskDesc(e.target.value)}
+                  placeholder="Additional instructions..."
+                />
+              </div>
+              <div className="flex gap-4 pt-4">
+                <Button variant="ghost" className="flex-1" onClick={() => setShowTaskModal(false)}>Cancel</Button>
+                <Button className="flex-1 bg-neon-lime text-black font-bold hover:bg-neon-lime/90" onClick={handleAssignTask}>Assign</Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </div>
   );
 }

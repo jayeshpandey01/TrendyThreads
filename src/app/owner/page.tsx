@@ -25,15 +25,7 @@ import {
   ResponsiveContainer 
 } from "recharts";
 
-const VISITS_DATA = [
-  { day: 'Mon', count: 45 },
-  { day: 'Tue', count: 52 },
-  { day: 'Wed', count: 38 },
-  { day: 'Thu', count: 65 },
-  { day: 'Fri', count: 48 },
-  { day: 'Sat', count: 72 },
-  { day: 'Sun', count: 85 },
-];
+
 
 export default function OwnerDashboard() {
   const { data: session } = useSession();
@@ -43,7 +35,9 @@ export default function OwnerDashboard() {
     todayVisits: 0,
     activeTrainers: 0,
     newRegistrations: 0,
-    recentActivity: []
+    recentActivity: [],
+    weeklyVisits: [],
+    revenue: 0
   });
 
   useEffect(() => {
@@ -57,7 +51,9 @@ export default function OwnerDashboard() {
             todayVisits: data.stats.todayVisits,
             activeTrainers: data.stats.activeTrainers,
             newRegistrations: data.stats.newRegistrations,
-            recentActivity: data.stats.recentActivity
+            recentActivity: data.stats.recentActivity,
+            weeklyVisits: data.stats.weeklyVisits || [],
+            revenue: data.stats.revenue || 0
           });
         }
       } catch (err) {
@@ -127,7 +123,7 @@ export default function OwnerDashboard() {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
           {[
             { label: "Total Visits today", value: stats.todayVisits.toString(), icon: Activity, color: "text-neon-lime", sub: "Daily check-ins" },
-            { label: "Revenue Share (M)", value: "₹0", icon: Wallet, color: "text-blue-400", sub: "Calculated from tokens" },
+            { label: "Revenue Share (M)", value: `₹${stats.revenue.toLocaleString()}`, icon: Wallet, color: "text-blue-400", sub: "Calculated from tokens" },
             { label: "Active Trainers", value: stats.activeTrainers.toString(), icon: Dumbbell, color: "text-purple-400", sub: "Full roster" },
             { label: "New Registrations", value: stats.newRegistrations.toString(), icon: Users, color: "text-orange-400", sub: "Last 7 days" },
           ].map((stat, i) => (
@@ -158,7 +154,7 @@ export default function OwnerDashboard() {
             </CardHeader>
             <CardContent className="h-[320px] w-full">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={VISITS_DATA}>
+                <BarChart data={stats.weeklyVisits}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#222" vertical={false} />
                   <XAxis 
                     dataKey="day" 

@@ -39,6 +39,10 @@ export default function UserDashboard() {
   const [visits, setVisits] = useState<any[]>([]);
   const [transactions, setTransactions] = useState<any[]>([]);
   const [weeklyVisits, setWeeklyVisits] = useState<WeeklyVisitPoint[]>([]);
+  const [avgWeeklyVisits, setAvgWeeklyVisits] = useState(0);
+  const [currentStreak, setCurrentStreak] = useState(0);
+  const [streakArray, setStreakArray] = useState<boolean[]>([]);
+  const [tasks, setTasks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showQR, setShowQR] = useState(false);
   const [buyingTokens, setBuyingTokens] = useState(false);
@@ -116,6 +120,10 @@ export default function UserDashboard() {
           setVisits(data.recentVisits);
           setTransactions(data.recentTransactions || []);
           setWeeklyVisits(Array.isArray(data.weeklyVisits) ? data.weeklyVisits : []);
+          setAvgWeeklyVisits(data.avgWeeklyVisits || 0);
+          setCurrentStreak(data.currentStreak || 0);
+          setStreakArray(data.streakArray || []);
+          setTasks(data.tasks || []);
         }
       } catch (err) {
         console.error(err);
@@ -128,6 +136,21 @@ export default function UserDashboard() {
       fetchData();
     }
   }, [session]);
+
+  const toggleTask = async (taskId: string, currentStatus: boolean) => {
+    try {
+      const res = await fetch("/api/trainer/tasks", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ taskId, isCompleted: !currentStatus })
+      });
+      if (res.ok) {
+        setTasks(prev => prev.map(t => t.id === taskId ? { ...t, isCompleted: !currentStatus } : t));
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
 
   // Handle Dynamic QR rotation
   useEffect(() => {
@@ -214,8 +237,8 @@ export default function UserDashboard() {
               <CardTitle className="text-xs font-bold text-white/40 uppercase tracking-widest">Avg. Weekly Visits</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-5xl font-black text-white">4.2</div>
-              <p className="text-[10px] text-neon-lime mt-2">↑ 12% from last month</p>
+              <div className="text-5xl font-black text-white">{avgWeeklyVisits}</div>
+              <p className="text-[10px] text-neon-lime mt-2">Past 28 Days</p>
             </CardContent>
           </Card>
 
@@ -225,9 +248,13 @@ export default function UserDashboard() {
               <TrendingUp className="text-neon-lime w-4 h-4" />
             </CardHeader>
             <CardContent className="flex gap-4">
-              {[1, 2, 3, 4, 5, 6, 7].map((day) => (
-                <div key={day} className={`flex-1 h-12 rounded-lg flex items-center justify-center border ${day < 6 ? 'bg-neon-lime/10 border-neon-lime/20 text-neon-lime' : 'bg-white/5 border-white/10 text-white/20'}`}>
-                  <div className="text-xs font-black">{day}</div>
+              {streakArray.length > 0 ? streakArray.map((visited, i) => (
+                <div key={i} className={`flex-1 h-12 rounded-lg flex items-center justify-center border ${visited ? 'bg-neon-lime/10 border-neon-lime/20 text-neon-lime' : 'bg-white/5 border-white/10 text-white/20'}`}>
+                  <div className="text-xs font-black">{visited ? '✓' : '-'}</div>
+                </div>
+              )) : [1, 2, 3, 4, 5, 6, 7].map((day) => (
+                <div key={day} className="flex-1 h-12 rounded-lg flex items-center justify-center border bg-white/5 border-white/10 text-white/20">
+                  <div className="text-xs font-black">-</div>
                 </div>
               ))}
             </CardContent>
@@ -280,19 +307,31 @@ export default function UserDashboard() {
              <Card className="bg-[#111] border-white/5 border-t-4 border-t-neon-lime group">
                 <CardHeader>
                   <CardTitle className="text-sm font-black flex items-center justify-between uppercase tracking-tighter">
-                    My Fitness Strategy
+                    Daily Tasks
                     <Sparkles size={16} className="text-neon-lime group-hover:animate-spin-slow" />
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <p className="text-xs text-white/40 leading-relaxed">
-                    Access your AI-generated workout and nutrition plan tailored specifically for your goals.
-                  </p>
-                  <Button asChild className="w-full bg-neon-lime text-black hover:bg-neon-lime/90 font-black h-11 rounded-xl">
-                    <Link href="/my-plan">
-                      View Strategy <ChevronRight size={16} className="ml-2" />
-                    </Link>
-                  </Button>
+                  {tasks.map(task => (
+                    <div key={task.id} className="p-3 bg-white/5 rounded-xl border border-white/10 flex gap-3 items-start cursor-pointer hover:border-neon-lime/30 transition-colors" onClick={() => toggleTask(task.id, task.isCompleted)}>
+                      <div className={`mt-0.5 w-4 h-4 rounded-full border flex items-center justify-center ${task.isCompleted ? 'bg-neon-lime border-neon-lime text-black' : 'border-white/30'}`}>
+                        {task.isCompleted && <span className="text-[10px] font-black">✓</span>}
+                      </div>
+                      <div>
+                        <h4 className={`text-sm font-bold ${task.isCompleted ? 'text-white/40 line-through' : 'text-white'}`}>{task.title}</h4>
+                        {task.description && <p className="text-[10px] text-white/40 mt-1">{task.description}</p>}
+                        <div className="flex items-center gap-2 mt-2">
+                          <p className="text-[8px] text-neon-lime uppercase tracking-widest">Assigned by {task.trainer?.name}</p>
+                          <Link href={`/dashboard/chat/${task.trainerId}`} className="text-[8px] text-blue-400 hover:text-blue-300 uppercase tracking-widest ml-2">Chat</Link>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                  {tasks.length === 0 && (
+                    <p className="text-xs text-white/40 leading-relaxed text-center">
+                      No daily tasks assigned.
+                    </p>
+                  )}
                 </CardContent>
              </Card>
 
