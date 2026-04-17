@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { verifySignedQR } from "@/lib/qr-service";
 
 export async function POST(req: Request) {
   try {
@@ -11,15 +12,29 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { userId, gymId: manualGymId } = await req.json().catch(() => ({}));
+    const { userId: incomingData, gymId: manualGymId } = await req.json().catch(() => ({}));
 
-    if (!userId) {
-      return NextResponse.json({ error: "Missing userId" }, { status: 400 });
+    if (!incomingData) {
+      return NextResponse.json({ error: "Missing scan data" }, { status: 400 });
     }
 
     const role = (session.user as any).role;
     if (role === "USER") {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    // Try to verify if it's a signed QR string
+    let userId = incomingData;
+    const verified = verifySignedQR(incomingData);
+    
+    if (verified) {
+      userId = verified.userId;
+    } else {
+      // If it's not a valid signed QR, check if the role is allowed to pass raw userId
+      // Only ADMIN should be allowed to manually enter/scan raw userIds for testing
+      if (role !== "ADMIN") {
+        return NextResponse.json({ error: "Invalid or expired QR code" }, { status: 400 });
+      }
     }
 
     const user = await prisma.user.findUnique({

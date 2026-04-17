@@ -29,11 +29,34 @@ export default function GymsListPage() {
   const [gyms, setGyms] = useState<GymFromApi[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const [userLocation, setUserLocation] = useState<{lat: number, lng: number} | null>(null);
+
+  useEffect(() => {
+    if ("geolocation" in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          setUserLocation({
+            lat: position.coords.latitude,
+            lng: position.coords.longitude
+          });
+        },
+        (error) => {
+          console.error("Error getting location", error);
+        }
+      );
+    }
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
     const run = async () => {
       try {
-        const res = await fetch("/api/gyms");
+        setLoading(true);
+        const url = userLocation 
+          ? `/api/gyms?lat=${userLocation.lat}&lng=${userLocation.lng}`
+          : "/api/gyms";
+          
+        const res = await fetch(url);
         if (!res.ok) throw new Error("Failed to load gyms");
         const data = (await res.json()) as unknown;
         if (!cancelled) setGyms(Array.isArray(data) ? (data as GymFromApi[]) : []);
@@ -48,7 +71,7 @@ export default function GymsListPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [userLocation]);
 
   const filteredGyms = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -140,7 +163,9 @@ export default function GymsListPage() {
                 <div className="flex items-center justify-between pt-4 border-t border-white/5">
                   <div className="flex items-center gap-2 text-white/40">
                     <Navigation size={14} className="text-neon-lime/40" />
-                    <span className="text-xs font-medium">View on map</span>
+                    <span className="text-xs font-medium">
+                      {(gym as any).distance ? `${(gym as any).distance.toFixed(1)} km away` : "View on map"}
+                    </span>
                   </div>
                   <Button size="sm" className="bg-white text-black hover:bg-neon-lime font-bold h-9 px-6 rounded-xl transition-all" asChild>
                     <Link href={`/gyms/${gym.id}`}>View Details</Link>

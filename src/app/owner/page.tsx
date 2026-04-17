@@ -104,7 +104,7 @@ export default function OwnerDashboard() {
             <h1 className="text-4xl font-black tracking-tighter">GYM <span className="text-neon-lime">CENTRAL</span></h1>
             <p className="text-white/40 text-sm font-light uppercase tracking-widest">Managing: <span className="text-white font-bold">{gym.name}</span></p>
           </div>
-          <div className="flex gap-4">
+          <div className="flex flex-wrap gap-4 mt-4 md:mt-0">
             <Button asChild variant="outline" className="border-white/10 bg-white/5 h-12 px-6">
               <Link href="/owner/trainers">
                 <Users className="mr-2 h-4 w-4" /> Manage Trainers
@@ -113,6 +113,11 @@ export default function OwnerDashboard() {
             <Button asChild className="bg-neon-lime text-black hover:bg-neon-lime/90 h-12 px-6 font-bold shadow-[0_0_20px_rgba(163,251,46,0.3)] transition-all">
               <Link href="/owner/trainers">
                 <Plus className="mr-2 h-4 w-4" /> Add Trainer
+              </Link>
+            </Button>
+            <Button asChild className="bg-white text-black hover:bg-white/90 h-12 px-6 font-bold transition-all">
+              <Link href="/trainer">
+                <Scan className="mr-2 h-4 w-4" /> Scan QR
               </Link>
             </Button>
           </div>

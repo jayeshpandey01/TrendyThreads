@@ -3,8 +3,9 @@
 import { useState, Suspense } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { signIn } from "next-auth/react";
+import { signIn, getSession } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { getDashboardPath } from "@/lib/dashboard-path";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -44,7 +45,10 @@ function LoginForm() {
       if (res?.error) {
         setError("Invalid email or password");
       } else {
-        router.push("/dashboard");
+        // Fetch session to get user role and redirect to correct dashboard
+        const session = await getSession();
+        const role = (session?.user as any)?.role;
+        router.push(getDashboardPath(role));
       }
     } catch (err) {
       setError("An error occurred during login");
@@ -125,7 +129,7 @@ function LoginForm() {
           variant="outline" 
           type="button" 
           className="w-full h-14 border-white/10 bg-white/5 hover:bg-white/10 backdrop-blur-sm"
-          onClick={() => signIn("google", { callbackUrl: "/dashboard" })}
+          onClick={() => signIn("google", { callbackUrl: "/api/auth/role-redirect" })}
         >
           Continue with Google
         </Button>

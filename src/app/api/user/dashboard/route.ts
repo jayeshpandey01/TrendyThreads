@@ -81,10 +81,17 @@ export async function GET() {
       }
     });
 
+    const recentTransactions = await prisma.tokenTransaction.findMany({
+      where: { userId, status: "SUCCESS" },
+      take: 5,
+      orderBy: { createdAt: "desc" },
+    });
+
     return NextResponse.json({
       tokenBalance: user?.tokenBalance || 0,
       recentVisits,
-      weeklyVisits
+      weeklyVisits,
+      recentTransactions
     });
   } catch (error) {
     console.error("[USER_DASHBOARD_GET]", error);

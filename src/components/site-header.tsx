@@ -5,10 +5,12 @@ import Image from "next/image";
 import { useSession, signOut } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import logo from "../../assest/Logo1.png";
+import { getDashboardPath } from "@/lib/dashboard-path";
 import { LogOut, LayoutDashboard } from "lucide-react";
 
 export function SiteHeader() {
   const { data: session, status } = useSession();
+  const dashboardHref = getDashboardPath((session?.user as any)?.role);
 
   return (
     <header className="px-6 lg:px-10 h-20 flex items-center justify-between border-b border-white/5 bg-black/50 backdrop-blur-xl sticky top-0 z-50">
@@ -43,7 +45,7 @@ export function SiteHeader() {
         {status === "authenticated" ? (
           <>
             <Button variant="ghost" asChild className="hidden sm:inline-flex hover:bg-white/5 text-white/70 hover:text-white">
-              <Link href="/dashboard" className="flex items-center gap-2">
+              <Link href={dashboardHref} className="flex items-center gap-2">
                 <LayoutDashboard className="w-4 h-4" />
                 Dashboard
               </Link>

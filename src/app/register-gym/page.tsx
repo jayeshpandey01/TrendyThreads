@@ -1,7 +1,8 @@
-﻿"use client";
+"use client";
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -35,6 +36,8 @@ export default function RegisterGymPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [photos]);
 
+  const { update } = useSession();
+
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setLoading(true);
@@ -57,8 +60,9 @@ export default function RegisterGymPage() {
       });
 
       if (res.ok) {
+        await update(); // Force update NextAuth session to get new OWNER role
         setSuccess(true);
-        setTimeout(() => router.push("/owner/dashboard"), 2000);
+        setTimeout(() => router.push("/owner"), 2000);
       }
     } catch (err) {
       console.error(err);

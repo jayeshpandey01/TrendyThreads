@@ -1,6 +1,7 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useSession } from "next-auth/react";
 import { 
   ShoppingBag, 
   Search, 
@@ -13,7 +14,8 @@ import {
   Plus,
   X,
   Minus,
-  ArrowRight
+  ArrowRight,
+  CheckCircle
 } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
@@ -21,6 +23,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { loadCart, saveCart, type CartItem } from "@/lib/cart";
+import { openRazorpayCheckout } from "@/lib/razorpay-checkout";
 import logo from "../../../assest/Logo1.png";
 
 type Product = {
@@ -38,6 +41,7 @@ const CATEGORIES = ["All Products", "Supplements", "Equipment", "Apparel", "Acce
 type Sort = "newest" | "price_asc" | "price_desc";
 
 export default function ShopPage() {
+  const { data: session } = useSession();
   const [q, setQ] = useState("");
   const [category, setCategory] = useState<(typeof CATEGORIES)[number]>("All Products");
   const [sort, setSort] = useState<Sort>("newest");
@@ -48,6 +52,7 @@ export default function ShopPage() {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [checkingOut, setCheckingOut] = useState(false);
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
+  const [checkoutSuccess, setCheckoutSuccess] = useState(false);
 
   useEffect(() => {
     setCart(loadCart());
@@ -133,24 +138,62 @@ export default function ShopPage() {
 
   const checkout = async () => {
     setCheckoutError(null);
+    setCheckoutSuccess(false);
     if (cart.length === 0) return;
     setCheckingOut(true);
     try {
+      // 1. Create Razorpay order via our API
       const res = await fetch("/api/orders", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ items: cart }),
       });
       if (!res.ok) {
-        const msg = await res.text();
-        throw new Error(msg || "Checkout failed");
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || "Checkout failed");
       }
-      setCart([]);
-      setCartOpen(false);
+      const { orderId, rzpOrderId, amount, currency } = await res.json();
+
+      // 2. Open Razorpay checkout modal
+      await openRazorpayCheckout({
+        rzpOrderId,
+        amount,
+        currency,
+        name: "Trendy Threads",
+        description: `Order #${orderId.slice(-6).toUpperCase()}`,
+        email: session?.user?.email || "",
+        prefillName: session?.user?.name || "",
+        onSuccess: async (response) => {
+          // 3. Verify payment on server
+          const verifyRes = await fetch("/api/payment/verify", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              ...response,
+              type: "SHOP_ORDER",
+            }),
+          });
+          const result = await verifyRes.json();
+          if (result.success) {
+            setCart([]);
+            setCheckoutSuccess(true);
+            setTimeout(() => {
+              setCartOpen(false);
+              setCheckoutSuccess(false);
+            }, 3000);
+          } else {
+            setCheckoutError("Payment captured but order update failed. Contact support.");
+          }
+          setCheckingOut(false);
+        },
+        onDismiss: () => {
+          setCheckingOut(false);
+          setCheckoutError("Payment cancelled.");
+        },
+      });
     } catch (e: any) {
       console.error(e);
       setCheckoutError(e?.message ?? "Checkout failed");
-    } finally {
       setCheckingOut(false);
     }
   };
@@ -417,17 +460,23 @@ export default function ShopPage() {
                 <span>Subtotal</span>
                 <span className="font-black text-white">₹{cartSubtotal}</span>
               </div>
-              <Button
-                className="w-full h-12 bg-neon-lime text-black hover:bg-neon-lime/90 font-black rounded-2xl"
-                disabled={checkingOut || cart.length === 0}
-                onClick={checkout}
-              >
-                {checkingOut ? "Placing order..." : (
-                  <>
-                    Checkout <ArrowRight className="ml-2 h-4 w-4" />
-                  </>
-                )}
-              </Button>
+              {checkoutSuccess ? (
+                <div className="w-full h-12 bg-neon-lime/20 text-neon-lime border border-neon-lime/50 rounded-2xl flex items-center justify-center font-black animate-in zoom-in duration-300">
+                  <CheckCircle className="mr-2 h-5 w-5" /> Order Placed!
+                </div>
+              ) : (
+                <Button
+                  className="w-full h-12 bg-neon-lime text-black hover:bg-neon-lime/90 font-black rounded-2xl"
+                  disabled={checkingOut || cart.length === 0}
+                  onClick={checkout}
+                >
+                  {checkingOut ? "Processing..." : (
+                    <>
+                      Checkout <ArrowRight className="ml-2 h-4 w-4" />
+                    </>
+                  )}
+                </Button>
+              )}
               <div className="text-[10px] text-white/25 text-center uppercase tracking-widest">
                 Orders are saved to your account
               </div>

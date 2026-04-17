@@ -1,8 +1,8 @@
 import { withAuth } from "next-auth/middleware";
 import { NextResponse } from "next/server";
 
-export default withAuth(
-  function middleware(req) {
+export const proxy = withAuth(
+  function proxy(req) {
     const token = req.nextauth.token;
     const path = req.nextUrl.pathname;
     const adminEmails = (process.env.ADMIN_EMAILS ?? "")
@@ -15,8 +15,8 @@ export default withAuth(
       return NextResponse.redirect(new URL("/", req.url));
     }
 
-    // Trainer only routes
-    if (path.startsWith("/trainer") && token?.role !== "TRAINER" && token?.role !== "ADMIN") {
+    // Trainer only routes (Owners and Admins also have access)
+    if (path.startsWith("/trainer") && !["TRAINER", "OWNER", "ADMIN"].includes(token?.role as string)) {
       return NextResponse.redirect(new URL("/", req.url));
     }
 

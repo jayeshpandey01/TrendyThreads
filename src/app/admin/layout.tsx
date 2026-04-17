@@ -11,6 +11,9 @@ export default async function AdminLayout(props: { children: ReactNode }) {
   const email = session?.user?.email ?? "";
   const ok = isAdminEmail(email);
 
+  console.log(`[ADMIN_LAYOUT] Session:`, JSON.stringify(session));
+  console.log(`[ADMIN_LAYOUT] Email: "${email}", isAdminEmail: ${ok}`);
+
   if (!ok) {
     return (
       <div className="min-h-screen bg-[#0a0a0a] text-white flex items-center justify-center p-6">

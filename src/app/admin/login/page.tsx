@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { signIn } from "next-auth/react";
+import { signIn, getSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
+import { getDashboardPath } from "@/lib/dashboard-path";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,7 +24,7 @@ export default function AdminLoginPage() {
     const email = String(form.get("email") ?? "");
     const password = String(form.get("password") ?? "");
 
-    const res = await signIn("admin-credentials", {
+    const res = await signIn("credentials", {
       email,
       password,
       redirect: false,
@@ -32,7 +33,9 @@ export default function AdminLoginPage() {
     if (res?.error) {
       setError("Invalid admin email or password");
     } else {
-      router.push("/admin");
+      const session = await getSession();
+      const role = (session?.user as any)?.role;
+      router.push(getDashboardPath(role));
     }
 
     setLoading(false);

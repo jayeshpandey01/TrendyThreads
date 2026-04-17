@@ -11,8 +11,11 @@ import {
   User as UserIcon,
   ChevronRight,
   Plus,
-  LogOut
+  LogOut,
+  Download,
+  Sparkles
 } from "lucide-react";
+import Link from "next/link";
 import { signOut } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -25,6 +28,7 @@ import {
   Tooltip, 
   ResponsiveContainer 
 } from "recharts";
+import { openRazorpayCheckout } from "@/lib/razorpay-checkout";
 
 type WeeklyVisitPoint = { name: string; visits: number };
 
@@ -33,9 +37,74 @@ export default function UserDashboard() {
   const [tokens, setTokens] = useState(0);
   const [qrCode, setQrCode] = useState("");
   const [visits, setVisits] = useState<any[]>([]);
+  const [transactions, setTransactions] = useState<any[]>([]);
   const [weeklyVisits, setWeeklyVisits] = useState<WeeklyVisitPoint[]>([]);
   const [loading, setLoading] = useState(true);
   const [showQR, setShowQR] = useState(false);
+  const [buyingTokens, setBuyingTokens] = useState(false);
+  const [customTokens, setCustomTokens] = useState(5);
+  const [tokenMsg, setTokenMsg] = useState<string | null>(null);
+
+  const handleBuyTokens = async (count: number) => {
+    if (buyingTokens || count <= 0) return;
+    setBuyingTokens(true);
+    setTokenMsg(null);
+    try {
+      const res = await fetch("/api/user/tokens/buy", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tokens: count }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || "Failed to create order");
+      }
+      const { id, amount, currency } = await res.json();
+
+      await openRazorpayCheckout({
+        rzpOrderId: id,
+        amount,
+        currency,
+        name: "Trendy Threads",
+        description: `${count} Gym Session Tokens`,
+        email: session?.user?.email || "",
+        prefillName: session?.user?.name || "",
+        onSuccess: async (response) => {
+          // Verify on server
+          const verifyRes = await fetch("/api/payment/verify", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              ...response,
+              type: "TOKEN_PURCHASE",
+            }),
+          });
+          const result = await verifyRes.json();
+          if (result.success) {
+            setTokens((prev) => prev + count);
+            setTokenMsg(`✓ ${count} tokens added successfully!`);
+            // Refresh transactions
+            const dashRes = await fetch("/api/user/dashboard");
+            if (dashRes.ok) {
+              const data = await dashRes.json();
+              setTransactions(data.recentTransactions || []);
+            }
+          } else {
+            setTokenMsg("Payment verified but tokens not credited. Contact support.");
+          }
+          setBuyingTokens(false);
+        },
+        onDismiss: () => {
+          setBuyingTokens(false);
+          setTokenMsg("Payment cancelled.");
+        },
+      });
+    } catch (e: any) {
+      console.error(e);
+      setTokenMsg(e?.message || "Failed to buy tokens");
+      setBuyingTokens(false);
+    }
+  };
 
   useEffect(() => {
     const fetchData = async () => {
@@ -45,12 +114,8 @@ export default function UserDashboard() {
           const data = await res.json();
           setTokens(data.tokenBalance);
           setVisits(data.recentVisits);
+          setTransactions(data.recentTransactions || []);
           setWeeklyVisits(Array.isArray(data.weeklyVisits) ? data.weeklyVisits : []);
-          
-          if (session?.user) {
-            const qr = await QRCode.toDataURL((session.user as any).id);
-            setQrCode(qr);
-          }
         }
       } catch (err) {
         console.error(err);
@@ -63,6 +128,34 @@ export default function UserDashboard() {
       fetchData();
     }
   }, [session]);
+
+  // Handle Dynamic QR rotation
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+
+    const refreshQR = async () => {
+      if (!session || !showQR) return;
+      try {
+        const res = await fetch("/api/user/qr");
+        if (res.ok) {
+          const { qrString } = await res.json();
+          const qrDataUrl = await QRCode.toDataURL(qrString);
+          setQrCode(qrDataUrl);
+        }
+      } catch (err) {
+        console.error("Failed to refresh QR:", err);
+      }
+    };
+
+    if (showQR) {
+      refreshQR();
+      interval = setInterval(refreshQR, 30000); // Refresh every 30s
+    }
+
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [session, showQR]);
 
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-white p-6 lg:p-10">
@@ -184,24 +277,71 @@ export default function UserDashboard() {
 
           {/* Quick Actions & Recent History */}
           <div className="space-y-6 lg:col-span-1">
+             <Card className="bg-[#111] border-white/5 border-t-4 border-t-neon-lime group">
+                <CardHeader>
+                  <CardTitle className="text-sm font-black flex items-center justify-between uppercase tracking-tighter">
+                    My Fitness Strategy
+                    <Sparkles size={16} className="text-neon-lime group-hover:animate-spin-slow" />
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <p className="text-xs text-white/40 leading-relaxed">
+                    Access your AI-generated workout and nutrition plan tailored specifically for your goals.
+                  </p>
+                  <Button asChild className="w-full bg-neon-lime text-black hover:bg-neon-lime/90 font-black h-11 rounded-xl">
+                    <Link href="/my-plan">
+                      View Strategy <ChevronRight size={16} className="ml-2" />
+                    </Link>
+                  </Button>
+                </CardContent>
+             </Card>
+
              <Card className="bg-[#111] border-white/5 overflow-hidden">
                 <CardHeader className="bg-neon-lime">
                   <CardTitle className="text-black text-sm font-black flex items-center justify-between uppercase tracking-tighter">
-                    Quick Buy
+                    Buy Tokens
                     <CreditCard size={16} />
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="p-6 space-y-4">
-                  <div className="flex justify-between items-center p-4 bg-white/5 rounded-2xl border border-white/10 hover:border-neon-lime/30 transition-all group cursor-pointer">
-                    <div>
-                      <h4 className="font-bold text-sm">10 Sessions</h4>
-                      <p className="text-[10px] text-white/40">Popular choice</p>
+                  {tokenMsg && (
+                    <div className={`text-xs p-3 rounded-xl border ${tokenMsg.startsWith('✓') ? 'bg-neon-lime/10 border-neon-lime/20 text-neon-lime' : 'bg-red-500/10 border-red-500/20 text-red-400'}`}>
+                      {tokenMsg}
                     </div>
-                    <div className="text-neon-lime font-black">₹450</div>
+                  )}
+                  {[{ count: 5, label: "5 Sessions", price: 250, tag: "Starter" }, { count: 10, label: "10 Sessions", price: 500, tag: "Popular" }, { count: 25, label: "25 Sessions", price: 1250, tag: "Pro" }].map((pkg) => (
+                    <button
+                      key={pkg.count}
+                      onClick={() => handleBuyTokens(pkg.count)}
+                      disabled={buyingTokens}
+                      className="w-full flex justify-between items-center p-4 bg-white/5 rounded-2xl border border-white/10 hover:border-neon-lime/30 transition-all group cursor-pointer disabled:opacity-50"
+                    >
+                      <div className="text-left">
+                        <h4 className="font-bold text-sm">{pkg.label}</h4>
+                        <p className="text-[10px] text-white/40">{pkg.tag}</p>
+                      </div>
+                      <div className="text-neon-lime font-black">₹{pkg.price}</div>
+                    </button>
+                  ))}
+
+                  <div className="flex gap-2">
+                    <input
+                      type="number"
+                      min={1}
+                      max={100}
+                      value={customTokens}
+                      onChange={(e) => setCustomTokens(Math.max(1, parseInt(e.target.value) || 1))}
+                      className="flex-1 h-12 bg-white/5 border border-white/10 rounded-xl px-4 text-white text-center font-bold focus:border-neon-lime/50 focus:outline-none"
+                    />
+                    <Button
+                      className="h-12 bg-white text-black hover:bg-white/90 font-bold px-6 rounded-xl"
+                      disabled={buyingTokens}
+                      onClick={() => handleBuyTokens(customTokens)}
+                    >
+                      {buyingTokens ? "Processing..." : `Buy ₹${customTokens * 50}`}
+                    </Button>
                   </div>
-                  <Button className="w-full h-12 bg-white text-black hover:bg-white/90">
-                    <Plus className="mr-2 w-4 h-4" /> Customized Package
-                  </Button>
+                  <p className="text-[10px] text-white/20 text-center">1 Token = ₹50 • Powered by Razorpay</p>
                 </CardContent>
              </Card>
 
@@ -224,6 +364,40 @@ export default function UserDashboard() {
                     ))}
                     {visits.length === 0 && (
                       <p className="text-center text-white/20 py-10 text-xs">No recent visits</p>
+                    )}
+                  </div>
+                </CardContent>
+             </Card>
+
+             <Card className="bg-[#111] border-white/5">
+                <CardHeader className="pb-0 pt-6 px-6">
+                  <CardTitle className="text-sm font-bold flex items-center gap-2">
+                    <CreditCard size={16} className="text-neon-lime" /> Payment History
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-6">
+                  <div className="space-y-4">
+                    {transactions.map((t: any, i: number) => (
+                      <div key={i} className="flex items-center justify-between group p-3 bg-white/5 rounded-xl border border-transparent hover:border-neon-lime/30 transition-all">
+                        <div className="space-y-1">
+                          <h4 className="text-xs font-bold uppercase">{t.tokens} Tokens</h4>
+                          <p className="text-[10px] text-white/30">{new Date(t.createdAt).toLocaleDateString()}</p>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <div className="text-white font-black text-xs">₹{t.amount}</div>
+                          <a 
+                            href={`/api/user/invoices/${t.id}`}
+                            download
+                            className="p-2 bg-neon-lime/10 text-neon-lime rounded-lg hover:bg-neon-lime hover:text-black transition-colors"
+                            title="Download Invoice"
+                          >
+                            <Download size={14} />
+                          </a>
+                        </div>
+                      </div>
+                    ))}
+                    {transactions.length === 0 && (
+                      <p className="text-center text-white/20 py-5 text-xs">No transactions yet</p>
                     )}
                   </div>
                 </CardContent>

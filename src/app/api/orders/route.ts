@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import Razorpay from "razorpay";
 
 type CartItemInput = { productId: string; qty: number };
 
@@ -54,31 +55,43 @@ export async function POST(req: Request) {
       };
     });
 
-    const order = await prisma.$transaction(async (tx) => {
-      for (const i of items) {
-        await tx.product.update({
-          where: { id: i.productId },
-          data: { stock: { decrement: i.qty } },
-        });
-      }
+    const razorpay = new Razorpay({
+      key_id: process.env.RAZORPAY_KEY_ID!,
+      key_secret: process.env.RAZORPAY_KEY_SECRET!,
+    });
 
-      return await tx.order.create({
+    const order = await prisma.$transaction(async (tx) => {
+      // Create the DB order first
+      const dbOrder = await tx.order.create({
         data: {
           userId,
           items: orderItems,
           totalAmount,
           status: "PENDING",
         },
-        select: {
-          id: true,
-          totalAmount: true,
-          status: true,
-          createdAt: true,
+      });
+
+      // Create Razorpay order
+      const rzpOrder = await razorpay.orders.create({
+        amount: Math.round(totalAmount * 100), // in paisa
+        currency: "INR",
+        receipt: dbOrder.id,
+        notes: {
+          orderId: dbOrder.id,
+          userId,
+          type: "SHOP_ORDER",
         },
       });
+
+      return { dbOrder, rzpOrder };
     });
 
-    return NextResponse.json(order);
+    return NextResponse.json({
+      orderId: order.dbOrder.id,
+      rzpOrderId: order.rzpOrder.id,
+      amount: order.rzpOrder.amount,
+      currency: order.rzpOrder.currency,
+    });
   } catch (error: any) {
     console.error("[ORDERS_POST]", error);
     const msg = typeof error?.message === "string" ? error.message : "Internal Error";
